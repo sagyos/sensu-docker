@@ -1,0 +1,85 @@
+api:
+  image: sagi_sensu
+  links:
+    - redis
+    - rabbitmq
+  command: api
+  environment:
+    - TRANSPORT_NAME=rabbitmq
+    - RABBITMQ_PORT=5671
+    - RABBITMQ_USER=sensu
+    - RABBITMQ_PASSWORD=sensu
+    - RABBITMQ_VHOST=/sensu
+    - RABBITMQ_SSL_SUPPORT=true
+    - RABBITMQ_SSL_CERT=/etc/sensu/ssl/cert.pem
+    - RABBITMQ_SSL_KEY=/etc/sensu/ssl/key.pem
+    - RABBITMQ_PORT_5672_TCP_PORT=5671
+  ports:
+    - '4567:4567'
+  volumes:
+    - ./ssl/server/:/etc/sensu/ssl
+server:
+  image: sagi_sensu
+  environment:
+    - TRANSPORT_NAME=rabbitmq
+    - RABBITMQ_PORT=5671
+    - RABBITMQ_USER=sensu
+    - RABBITMQ_PASSWORD=sensu
+    - RABBITMQ_VHOST=/sensu
+    - RABBITMQ_SSL_SUPPORT=true
+    - RABBITMQ_SSL_CERT=/etc/sensu/ssl/cert.pem
+    - RABBITMQ_SSL_KEY=/etc/sensu/ssl/key.pem
+    - RABBITMQ_PORT_5672_TCP_PORT=5671
+  links:
+    - redis
+    - api
+    - rabbitmq
+  command: server
+  volumes:
+    - ./ssl/server/:/etc/sensu/ssl
+client:
+  image: sagi_sensu
+  links:
+    - rabbitmq
+  environment:
+    - TRANSPORT_NAME=rabbitmq
+    - CLIENT_NAME=test
+    - CLIENT_SUBSCRIPTIONS=all, docker
+    - CLIENT_ADDRESS=168.192.43.31
+    - RABBITMQ_PORT=5671
+    - RABBITMQ_USER=sensu
+    - RABBITMQ_PASSWORD=sensu
+    - RABBITMQ_VHOST=/sensu
+    - RABBITMQ_SSL_SUPPORT=true
+    - RABBITMQ_SSL_CERT=/etc/sensu/ssl/cert.pem
+    - RABBITMQ_SSL_KEY=/etc/sensu/ssl/key.pem
+    - RABBITMQ_PORT_5672_TCP_PORT=5671
+  ports:
+    - '3030:3030'
+  command: client
+  volumes:
+    - ./ssl/server/:/etc/sensu/ssl
+redis:
+  image: redis:3
+  ports:
+    - '6379:6379'
+uchiwa:
+  image: sstarcher/uchiwa
+  environment:
+    SENSU_DC_NAME: test
+    SENSU_HOSTNAME: api
+  links:
+    - api
+  ports:
+    - '80:3000'
+
+rabbitmq:
+  image: rabbitmq:3-management
+  ports:
+    - "15672:15672" # Optional, only opened for rabbitmq management
+    - "5671:5671" # Opened for Sensu clients
+  volumes:
+    - "./config/rabbitmq.config:/etc/rabbitmq/rabbitmq.config:ro"
+    - "./ssl/sensu_ca/cacert.pem:/etc/rabbitmq/ssl/cacert.pem:ro"
+    - "./ssl/server/cert.pem:/etc/rabbitmq/ssl/cert.pem:ro"
+    - "./ssl/server/key.pem:/etc/rabbitmq/ssl/key.pem:ro"
